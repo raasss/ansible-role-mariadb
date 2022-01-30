@@ -1,0 +1,17 @@
+[mariadb]
+
+# Server Configuration
+log_error                = mariadbd.err
+# innodb_buffer_pool_size  = 1G
+innodb_buffer_pool_size  = 100M
+
+
+# Cluster Configuration
+wsrep_provider           = /usr/lib/galera/libgalera_smm.so
+wsrep_node_address       = {{ mariadb_wsrep_node_address }}
+wsrep_cluster_address    = gcomm://{{ mariadb_wsrep_cluster_address }}
+wsrep_cluster_name       = {{ mariadb_wsrep_cluster_name }}
+wsrep_on                 = ON
+
+binlog_format            = ROW
+innodb_autoinc_lock_mode = 2

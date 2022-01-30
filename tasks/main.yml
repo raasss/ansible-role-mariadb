@@ -1,0 +1,170 @@
+---
+# tasks file for roles/mariadb
+
+- name: Install packages
+  apt:
+    name:
+      - mariadb-server-10.3
+      - mariadb-client-10.3
+      - mariadb-backup
+      - python3-mysqldb
+    install_recommends: no
+    purge: yes
+    state: present
+
+- name: Install galera required packages
+  apt:
+    name:
+      - galera-3
+    install_recommends: no
+    purge: yes
+    state: present
+  when: mariadb_galera_enabled
+
+# - name: Set bind-address
+#   ansible.builtin.lineinfile:
+#     path: /etc/mysql/mariadb.conf.d/50-server.cnf
+#     regexp: '^bind-address '
+#     line: bind-address = 0.0.0.0
+#   notify: restart mariadb
+
+- name: Copy CA certificate
+  copy:
+    src: "{{ mariadb_ssl_ca }}"
+    dest: /etc/mysql/ca.pem
+    mode: 0644
+    owner: root
+    group: root
+  # TODO: fix this using command FLUSH SSL insread of restarting service
+  when: mariadb_ssl_ca is defined
+  notify:
+    - restart mariadb
+
+- name: Copy certificate
+  copy:
+    src: "{{ mariadb_ssl_cert }}"
+    dest: /etc/mysql/server-cert.pem
+    mode: 0644
+    owner: root
+    group: root
+  # TODO: fix this using command FLUSH SSL insread of restarting service
+  when: mariadb_ssl_cert is defined
+  notify:
+    - restart mariadb
+
+- name: Copy certificate key
+  copy:
+    src: "{{ mariadb_ssl_key }}"
+    dest: /etc/mysql/server-key.pem
+    mode: 0640
+    owner: root
+    group: mysql
+  # TODO: fix this using command FLUSH SSL insread of restarting service
+  when: mariadb_ssl_key is defined
+  notify:
+    - restart mariadb
+
+- name: Configure 50-server.cnf
+  template:
+    src: 50-server.cnf.j2
+    dest: /etc/mysql/mariadb.conf.d/50-server.cnf
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - restart mariadb
+
+- name: Configure z-galera.cnf
+  template:
+    src: z-galera.cnf.j2
+    dest: /etc/mysql/mariadb.conf.d/z-galera.cnf
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - restart mariadb
+  when: mariadb_galera_enabled
+
+- name: Set permissions on /etc/mysql
+  file:
+    path: /etc/mysql
+    state: directory
+    mode: 0750
+    owner: root
+    group: mysql
+
+- name: Configure datadir directory
+  file:
+    path: /srv/mysql
+    state: directory
+    mode: 0750
+    owner: mysql
+    group: mysql
+
+- name: Early flush of handlers
+  meta: flush_handlers
+
+- name: Enable and start service
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: Set root user password
+  community.mysql.mysql_user:
+    name: root
+    host_all: yes
+    password: "{{ mariadb_root_password }}"
+    encrypted: no
+    update_password: always
+    state: present
+  when: mariadb_root_password is defined
+  failed_when: false
+  throttle: 1
+
+- name: Remove all anonymous user accounts
+  community.mysql.mysql_user:
+    login_password: "{{ mariadb_root_password | default(omit) }}"
+    name: ''
+    host_all: yes
+    state: absent
+  throttle: 1
+
+- name: Remove test database
+  community.mysql.mysql_db:
+    login_password: "{{ mariadb_root_password | default(omit) }}"
+    name: "test"
+    state: absent
+  throttle: 1
+
+- name: Create users
+  community.mysql.mysql_user:
+    login_password: "{{ mariadb_root_password | default(omit) }}"
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    host: "%"
+    # host_all: yes
+    priv: "{{ item.priv }}"
+    state: present
+  loop: "{{ mariadb_users }}"
+  throttle: 1
+
+- name: Create users for localhost access
+  community.mysql.mysql_user:
+    login_password: "{{ mariadb_root_password | default(omit) }}"
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    host: "localhost"
+    # host_all: yes
+    priv: "{{ item.priv }}"
+    state: present
+  loop: "{{ mariadb_users }}"
+  throttle: 1
+
+- name: Create databases
+  community.mysql.mysql_db:
+    login_password: "{{ mariadb_root_password | default(omit) }}"
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ mariadb_databases }}"
+  throttle: 1

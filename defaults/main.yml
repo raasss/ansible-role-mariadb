@@ -1,0 +1,7 @@
+---
+# defaults file for roles/mariadb
+mariadb_bind_address: "0.0.0.0"
+mariadb_databases: []
+mariadb_users: []
+mariadb_galera_enabled: false
+mariadb_datadir: "/var/lib/mysql"
