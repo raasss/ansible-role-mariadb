@@ -1,6 +1,4 @@
 ---
-# tasks file for roles/mariadb
-
 - name: Install packages
   apt:
     name:
@@ -20,13 +18,6 @@
     purge: yes
     state: present
   when: mariadb_galera_enabled
-
-# - name: Set bind-address
-#   ansible.builtin.lineinfile:
-#     path: /etc/mysql/mariadb.conf.d/50-server.cnf
-#     regexp: '^bind-address '
-#     line: bind-address = 0.0.0.0
-#   notify: restart mariadb
 
 - name: Copy CA certificate
   copy:
@@ -143,7 +134,6 @@
     name: "{{ item.name }}"
     password: "{{ item.password }}"
     host: "%"
-    # host_all: yes
     priv: "{{ item.priv }}"
     state: present
   loop: "{{ mariadb_users }}"
@@ -155,7 +145,6 @@
     name: "{{ item.name }}"
     password: "{{ item.password }}"
     host: "localhost"
-    # host_all: yes
     priv: "{{ item.priv }}"
     state: present
   loop: "{{ mariadb_users }}"
